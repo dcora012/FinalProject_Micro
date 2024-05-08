@@ -1,1 +1,107 @@
-test 
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+#define LCD_ADDRESS 0x27
+#define LCD_COLUMNS 16
+#define LCD_ROWS 2
+
+const int sensorPins[] = {2, 3, 4, 5};
+const int buttonPins[] = {6, 7};
+const int piezoPin = 13;
+
+int coinCounts[] = {0, 0, 0, 0}; // Array para el conteo de monedas por sensor
+int currentSensor = 0; // Índice del sensor actual
+float accumulatedValue = 0;
+
+LiquidCrystal_I2C lcd(LCD_ADDRESS, LCD_COLUMNS, LCD_ROWS);
+
+void setup() {
+  for (int i = 0; i < 4; i++) {
+    pinMode(sensorPins[i], INPUT);
+  }
+  for (int i = 0; i < 2; i++) {
+    pinMode(buttonPins[i], INPUT);
+  }
+  pinMode(piezoPin, OUTPUT);
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Current Value:");
+  lcd.setCursor(0, 1);
+  lcd.print("$0.00");
+
+  Serial.begin(9600);
+}
+
+void loop() {
+  for (int i = 0; i < 4; i++) {
+    if (digitalRead(sensorPins[i]) == LOW) {
+      coinCounts[i]++; // Incrementa el conteo de monedas para el sensor actual
+      accumulatedValue += (i == 0 ? 25 : (i == 1 ? 10 : (i == 2 ? 5 : 1)));
+      tone(piezoPin, 1000, 100);
+      delay(1000);
+      printValueOnLCD(accumulatedValue);
+    }
+  }
+
+  if (digitalRead(buttonPins[0]) == HIGH) {
+    countCoins(); // Llama a la función para mostrar el conteo de monedas
+    delay(500); // Agrega un pequeño retraso para evitar múltiples pulsaciones rápidas
+  }
+
+  if (digitalRead(buttonPins[1]) == HIGH) {
+    resetCount(); // Llama a la función para restablecer el conteo de monedas
+    delay(100); // Agrega un pequeño retraso para evitar múltiples pulsaciones rápidas
+  }
+}
+
+void printValueOnLCD(float value) {
+  lcd.setCursor(0, 1);
+  lcd.print("                ");
+  lcd.setCursor(0, 1);
+  lcd.print("$");
+  lcd.print(value / 100.0, 2);
+}
+
+void countCoins() {
+  lcd.clear(); // Borra la pantalla LCD para mostrar el conteo de monedas del sensor actual
+
+  lcd.setCursor(0, 0);
+  lcd.print("$");
+
+  float coinValue = 0.0;
+  switch (currentSensor) {
+    case 0:
+      coinValue = 0.25;
+      break;
+    case 1:
+      coinValue = 0.10;
+      break;
+    case 2:
+      coinValue = 0.05;
+      break;
+    case 3:
+      coinValue = 0.01;
+      break;
+  }
+
+  lcd.print(coinValue, 2);
+  lcd.print(": ");
+  lcd.print(coinCounts[currentSensor]);
+  lcd.print(" coins");
+
+  currentSensor = (currentSensor + 1) % 4; // Avanza al siguiente sensor circularmente
+}
+
+void resetCount() {
+  for (int i = 0; i < 4; i++) {
+    coinCounts[i] = 0; // Restablece el conteo de monedas para cada sensor
+  }
+  accumulatedValue = 0; // Restablece el valor acumulado
+  lcd.clear(); // Borra la pantalla LCD
+  lcd.setCursor(0, 0);
+  lcd.print("Current Value:");
+  lcd.setCursor(0, 1);
+  lcd.print("$0.00");
+} 
